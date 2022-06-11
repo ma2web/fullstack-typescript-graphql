@@ -1,10 +1,11 @@
-import { MikroORM } from "@mikro-orm/core";
-import { ApolloServer } from "apollo-server-express";
-import express from "express";
+import { MikroORM } from '@mikro-orm/core';
+import { ApolloServer } from 'apollo-server-express';
+import express from 'express';
 import 'reflect-metadata';
-import { buildSchema } from "type-graphql";
-import microConfig from "./mikro-orm.config";
-import { PostResolver } from "./resolvers/post";
+import { buildSchema } from 'type-graphql';
+import microConfig from './mikro-orm.config';
+import { PostResolver } from './resolvers/post';
+import { UserResolver } from './resolvers/user';
 
 const main = async () => {
   const orm = await MikroORM.init(microConfig);
@@ -14,7 +15,7 @@ const main = async () => {
 
   const apolloServer = new ApolloServer({
     schema: await buildSchema({
-      resolvers: [PostResolver],
+      resolvers: [PostResolver, UserResolver],
       validate: false,
     }),
     context: () => ({ em: orm.em }),
@@ -25,7 +26,7 @@ const main = async () => {
   apolloServer.applyMiddleware({ app });
 
   app.listen(4000, () => {
-    console.log("listening on port 4000");
+    console.log('listening on port 4000');
   });
 };
 
