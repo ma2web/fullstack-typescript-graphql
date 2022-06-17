@@ -12,6 +12,11 @@ import {
 } from 'type-graphql';
 import { User } from '../entities/User';
 
+declare module 'express-session' {
+  export interface SessionData {
+    user: { [key: string]: any };
+  }
+}
 @InputType()
 class UsernamePasswordInput {
   @Field()
@@ -24,7 +29,6 @@ class UsernamePasswordInput {
 class FieldError {
   @Field()
   field: string;
-
   @Field()
   message: string;
 }
@@ -33,26 +37,60 @@ class FieldError {
 class UserResponse {
   @Field(() => [FieldError], { nullable: true })
   errors?: FieldError[];
-
   @Field(() => User, { nullable: true })
   user?: User;
 }
 
 @Resolver()
 export class UserResolver {
-  @Mutation(() => User)
+  @Mutation(() => UserResponse)
   async register(
     @Arg('options') options: UsernamePasswordInput,
     @Ctx() { em }: MyContext
-  ) {
+  ): Promise<UserResponse> {
+    if (options.username.length <= 2) {
+      return {
+        errors: [
+          {
+            field: 'username',
+            message: 'Username must be at least 3 characters',
+          },
+        ],
+      };
+    }
+
+    if (options.password.length <= 3) {
+      return {
+        errors: [
+          {
+            field: 'password',
+            message: 'password must be at least 3 characters',
+          },
+        ],
+      };
+    }
+
     const hashedPassword = await argon2.hash(options.password);
     const user = em.create(User, {
       username: options.username,
       password: hashedPassword,
     } as RequiredEntityData<User>);
-    await em.persistAndFlush(user);
 
-    return user;
+    try {
+      await em.persistAndFlush(user);
+    } catch (err) {
+      if (err.code === '23505') {
+        return {
+          errors: [
+            {
+              field: 'username',
+              message: 'Username already taken',
+            },
+          ],
+        };
+      }
+    }
+    return { user };
   }
 
   @Mutation(() => UserResponse)
@@ -84,6 +122,8 @@ export class UserResolver {
         ],
       };
     }
+
+    // req.session.user!.id = user.id;
 
     return { user };
   }
